@@ -95,6 +95,11 @@ func (c *httpClient) post(ctx context.Context, path string, payload any) httpRes
 		warnOnce("auth_error", "API key rejected; check AGENTPING_API_KEY. Events will be dropped.")
 	case resp.StatusCode == 429:
 		class = errClassServer
+	case resp.StatusCode == 404:
+		// Run-start is persisted asynchronously, so an event or finish can
+		// arrive before its run row exists. Treat 404 as transient and retry
+		// with back-off; a genuinely missing run drops after maxRetries.
+		class = errClassServer
 	case resp.StatusCode >= 500:
 		class = errClassServer
 		warnOnce("server_error", fmt.Sprintf("AgentPing API returned %d; will retry with back-off.", resp.StatusCode))

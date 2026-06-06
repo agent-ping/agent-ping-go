@@ -33,10 +33,10 @@ func (r *Run) Event(eventType string, data map[string]any) error {
 		warnOnce("client_error", "event() called after finish(); event still queued but server may reject.")
 	}
 	evt := map[string]any{
-		"id":   newID("evt", r.state.region),
-		"type": eventType,
-		"ts":   time.Now().UTC().Format(time.RFC3339Nano),
-		"data": data,
+		"external_id": newID("evt", r.state.region),
+		"type":        eventType,
+		"ts":          time.Now().UTC().Format(time.RFC3339Nano),
+		"data":        data,
 	}
 	r.state.queue.push(envelope{
 		kind:  envRunEvent,
