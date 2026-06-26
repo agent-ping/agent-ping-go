@@ -109,6 +109,34 @@ func (c *httpClient) post(ctx context.Context, path string, payload any) httpRes
 	return httpResult{status: resp.StatusCode, errClass: class, retryAfter: retryAfter}
 }
 
+// postRaw sends a JSON payload and returns the raw status code and response
+// body, emitting no warnings. The guard gate (guard-checks-spec) uses this so
+// it can own its own allow/block/unreachable translation rather than the
+// telemetry warn-and-retry semantics of post(). A transport error or timeout
+// returns a non-nil error.
+func (c *httpClient) postRaw(ctx context.Context, path string, payload any) (int, []byte, error) {
+	buf, err := json.Marshal(payload)
+	if err != nil {
+		return 0, nil, err
+	}
+	reqCtx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, c.baseURL+path, bytes.NewReader(buf))
+	if err != nil {
+		return 0, nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("User-Agent", userAgent)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, body, nil
+}
+
 func parseRetryAfter(header string) time.Duration {
 	if header == "" {
 		return 0

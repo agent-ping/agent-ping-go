@@ -11,6 +11,7 @@ type InitOption func(*initConfig)
 type initConfig struct {
 	apiKey        string
 	baseURL       string
+	controlURL    string
 	queueSize     int
 	flushInterval time.Duration
 	batchSize     int
@@ -25,6 +26,13 @@ func WithAPIKey(key string) InitOption {
 // WithBaseURL overrides the default API base URL. AGENTPING_BASE_URL also works.
 func WithBaseURL(url string) InitOption {
 	return func(c *initConfig) { c.baseURL = url }
+}
+
+// WithControlURL overrides the control-plane base URL used by GuardCheck
+// (guard-checks-spec). AGENTPING_CONTROL_URL also works. Defaults to the
+// region's control plane (EU: https://agentping.io).
+func WithControlURL(url string) InitOption {
+	return func(c *initConfig) { c.controlURL = url }
 }
 
 // WithQueueSize sets the bounded queue capacity. Default 1000.

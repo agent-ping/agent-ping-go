@@ -59,6 +59,40 @@ _ = agentping.Heartbeat("daily-summary", agentping.HeartbeatStatusOK,
 )
 ```
 
+## Guard (spend safety net)
+
+Put a guard at the top of a scheduled or autonomous program. It makes one
+blocking call to AgentPing, which checks your configured rules against your real
+cumulative spend, and refuses to start the run if a rule is tripped (or if an
+operator has paused the agent from the dashboard). Guard is on the Team and
+Business plans.
+
+```go
+// Hard mode (default): a block returns a *agentping.Paused error.
+v, err := agentping.GuardCheck(ctx, agentping.GuardRequest{
+	CustomerRef: "acme-corp",
+	Agent:       "nightly-summariser",
+	Function:    "run",
+})
+var paused *agentping.Paused
+if errors.As(err, &paused) {
+	log.Printf("blocked by %v: %v", paused.Verdict.BlockedBy, paused.Verdict.Rules)
+	return
+}
+_ = v
+```
+
+By default a guard fails closed: a block returns `*agentping.Paused`, and
+`OnUnreachable` defaults to `"block"` so the program does not run unless the gate
+confirms it is safe. That couples your scheduled runs to AgentPing's uptime; set
+`OnUnreachable: "allow"` to run when the gate is unreachable. In soft mode
+(`Mode: "soft"`) a block returns a nil error and you inspect `v.Blocked()`.
+
+A guard at the top of a program protects against the next invocation starting,
+not against one run that passes the check and then loops forever. Call
+`GuardCheck` at several points to turn it into a series of gates. Thresholds are
+set in USD.
+
 ## Auto-instrumentation
 
 The Go SDK uses `http.RoundTripper` wrappers rather than monkey-patching.
@@ -105,6 +139,7 @@ Mistral, Cohere, and Bedrock work fine, see
 | --- | --- | --- |
 | `WithAPIKey` | `AGENTPING_API_KEY` env | `apk_<region>_<32 hex>` |
 | `WithBaseURL` | `AGENTPING_BASE_URL` env, otherwise derived from the key's region: `https://{region}.ingest.agentping.io` | Override for staging or self-hosted |
+| `WithControlURL` | `AGENTPING_CONTROL_URL` env, otherwise region-derived (EU: `https://agentping.io`) | Control plane for `GuardCheck` |
 | `WithQueueSize` | 1000 | Max envelopes held in memory |
 | `WithFlushInterval` | 2s | How often the background worker drains |
 | `WithBatchSize` | 50 | Max events per HTTP POST |

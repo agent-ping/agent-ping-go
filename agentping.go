@@ -37,6 +37,12 @@ func Init(opts ...InitOption) error {
 	if cfg.baseURL == "" {
 		cfg.baseURL = defaultBaseURLForRegion(region)
 	}
+	if cfg.controlURL == "" {
+		cfg.controlURL = os.Getenv("AGENTPING_CONTROL_URL")
+	}
+	if cfg.controlURL == "" {
+		cfg.controlURL = defaultControlURLForRegion(region)
+	}
 	if cfg.queueSize <= 0 {
 		cfg.queueSize = defaultQueueSize
 	}
@@ -53,15 +59,18 @@ func Init(opts ...InitOption) error {
 
 	q := newBoundedQueue(cfg.queueSize)
 	client := newHTTPClient(cfg.apiKey, cfg.baseURL, cfg.httpClient, defaultRequestTimeout)
+	controlClient := newHTTPClient(cfg.apiKey, cfg.controlURL, cfg.httpClient, defaultRequestTimeout)
 	w := newWorker(q, client, cfg.flushInterval, cfg.batchSize)
 
 	s := &sdkState{
 		apiKey:        cfg.apiKey,
 		baseURL:       cfg.baseURL,
+		controlURL:    cfg.controlURL,
 		region:        region,
 		queue:         q,
 		worker:        w,
 		client:        client,
+		controlClient: controlClient,
 		flushInterval: cfg.flushInterval,
 		batchSize:     cfg.batchSize,
 	}

@@ -32,13 +32,29 @@ func defaultBaseURLForRegion(region string) string {
 	return "https://" + region + ".ingest.agentping.io"
 }
 
+// defaultControlURLForRegion returns the control-plane hostname for the SDK
+// to call (guard-checks-spec). The guard gate is served by the control plane,
+// not the ingest edge, so it has its own base URL. EU is served at the apex;
+// other regions are subdomained.
+func defaultControlURLForRegion(region string) string {
+	if _, ok := knownRegions[region]; !ok {
+		region = defaultRegion
+	}
+	if region == "eu" {
+		return "https://agentping.io"
+	}
+	return "https://" + region + ".agentping.io"
+}
+
 type sdkState struct {
 	apiKey        string
 	baseURL       string
+	controlURL    string
 	region        string
 	queue         *boundedQueue
 	worker        *worker
 	client        *httpClient
+	controlClient *httpClient
 	flushInterval time.Duration
 	batchSize     int
 }
