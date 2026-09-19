@@ -63,6 +63,10 @@ type runConfig struct {
 	feature     string
 	metadata    map[string]any
 	parentRunID string
+	idleTimeout int
+	idleStatus  string
+	resumeID    string
+	resumeStart time.Time
 }
 
 // WithCustomerID associates a run with an end customer.
@@ -83,6 +87,21 @@ func WithMetadata(m map[string]any) RunOption {
 // WithParentRunID links this run to a parent, building a run tree.
 func WithParentRunID(id string) RunOption {
 	return func(c *runConfig) { c.parentRunID = id }
+}
+
+// WithIdleTimeout closes the run automatically once no event has arrived for
+// this long (60s-24h). For callers that cannot be relied on to call Finish: a
+// browser that gets closed, a process that gets killed. It also makes the run
+// resumable, so a later event reopens it rather than being an orphan.
+func WithIdleTimeout(d time.Duration) RunOption {
+	return func(c *runConfig) { c.idleTimeout = int(d.Seconds()) }
+}
+
+// WithIdleStatus sets what the idle sweep finishes the run with. The server
+// default is "timeout" -- we stopped waiting, we do not know how it went. A
+// conversation should pass "success": the user leaving is not a failure.
+func WithIdleStatus(status string) RunOption {
+	return func(c *runConfig) { c.idleStatus = status }
 }
 
 // FinishOption configures Run.Finish.
