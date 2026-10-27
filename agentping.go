@@ -5,6 +5,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -54,6 +55,9 @@ func Init(opts ...InitOption) error {
 	if cfg.batchSize <= 0 {
 		cfg.batchSize = defaultBatchSize
 	}
+	if cfg.version == "" {
+		cfg.version = os.Getenv("AGENTPING_VERSION")
+	}
 
 	if cfg.apiKey == "" {
 		warnOnce("auth_error", "no AGENTPING_API_KEY supplied; events will be dropped client-side.")
@@ -75,6 +79,7 @@ func Init(opts ...InitOption) error {
 		controlClient: controlClient,
 		flushInterval: cfg.flushInterval,
 		batchSize:     cfg.batchSize,
+		version:       strings.TrimSpace(cfg.version),
 	}
 	setState(s)
 	w.start()
@@ -175,6 +180,11 @@ func NewRun(agent string, opts ...RunOption) *Run {
 	}
 	if cfg.feature != "" {
 		body["feature"] = cfg.feature
+	}
+	if version := strings.TrimSpace(cfg.version); version != "" {
+		body["version"] = version
+	} else if s.version != "" {
+		body["version"] = s.version
 	}
 	if cfg.metadata != nil {
 		body["metadata"] = cfg.metadata

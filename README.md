@@ -123,6 +123,22 @@ Streaming responses are wrapped transparently: chunks flow through to
 your code without delay and the SDK emits a single `llm_call` event when
 the stream closes, with accumulated token counts.
 
+Streams also report `ttft_ms`, the time from the request to the first
+content chunk, which Pulse charts as time to first token.
+
+Prompt and completion text are off by default. Pass
+`instrumentation.WithContentCapture(4000)` to a transport and each
+`llm_call` carries `input` (a list of `{role, content}` messages),
+`output` and `system_instructions`, each clipped at the cap; the run page
+shows them as messages. The request body is read and restored, so the
+provider receives it unchanged.
+
+```go
+anthropicHTTP := instrumentation.AnthropicHTTPClient(
+	http.DefaultTransport, run, instrumentation.WithContentCapture(4000),
+)
+```
+
 The SDK never sends `cost_usd` on `llm_call` events; the server computes
 cost from the rate card.
 
@@ -144,6 +160,10 @@ Mistral, Cohere, and Bedrock work fine, see
 | `WithFlushInterval` | 2s | How often the background worker drains |
 | `WithBatchSize` | 50 | Max events per HTTP POST |
 | `WithHTTPClient` | `&http.Client{}` | Inject your own client (useful for tests) |
+| `WithDefaultVersion` | `AGENTPING_VERSION` env | Build or prompt version every run starts with; `WithVersion` on `NewRun` overrides it. The Spend and Verify charts mark where each new version was first seen |
+
+Run options: `WithCustomerID`, `WithFeature`, `WithMetadata`, `WithParentRunID`,
+`WithVersion`, and for conversations `WithIdleTimeout` and `WithIdleStatus`.
 
 ## Contract guarantees
 

@@ -12,6 +12,6 @@ import "net/http"
 //
 // A nil run leaves the client functional but disables event emission, which is
 // useful for code paths where instrumentation is conditional.
-func AnthropicHTTPClient(base http.RoundTripper, run EventEmitter) *http.Client {
-	return &http.Client{Transport: NewAnthropicTransport(base, run)}
+func AnthropicHTTPClient(base http.RoundTripper, run EventEmitter, opts ...TransportOption) *http.Client {
+	return &http.Client{Transport: NewAnthropicTransport(base, run, opts...)}
 }

@@ -13,7 +13,7 @@ import (
 )
 
 const defaultRequestTimeout = 2 * time.Second
-const userAgent = "agentping-go/0.1"
+const userAgent = "agentping-go/0.2"
 
 type errorClass string
 

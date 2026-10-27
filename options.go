@@ -16,6 +16,7 @@ type initConfig struct {
 	flushInterval time.Duration
 	batchSize     int
 	httpClient    *http.Client
+	version       string
 }
 
 // WithAPIKey sets the API key directly. If not provided, AGENTPING_API_KEY is read.
@@ -55,6 +56,14 @@ func WithHTTPClient(h *http.Client) InitOption {
 	return func(c *initConfig) { c.httpClient = h }
 }
 
+// WithDefaultVersion labels every run this process starts with the build or
+// prompt version that produced it, unless the run sets its own WithVersion.
+// AGENTPING_VERSION also works. The dashboard's Spend and Verify charts mark
+// where each new version was first seen.
+func WithDefaultVersion(v string) InitOption {
+	return func(c *initConfig) { c.version = v }
+}
+
 // RunOption configures a new run.
 type RunOption func(*runConfig)
 
@@ -67,6 +76,7 @@ type runConfig struct {
 	idleStatus  string
 	resumeID    string
 	resumeStart time.Time
+	version     string
 }
 
 // WithCustomerID associates a run with an end customer.
@@ -82,6 +92,12 @@ func WithFeature(f string) RunOption {
 // WithMetadata attaches arbitrary structured metadata.
 func WithMetadata(m map[string]any) RunOption {
 	return func(c *runConfig) { c.metadata = m }
+}
+
+// WithVersion labels the run with the build or prompt version that produced
+// it (up to 64 characters), overriding Init's WithDefaultVersion.
+func WithVersion(v string) RunOption {
+	return func(c *runConfig) { c.version = v }
 }
 
 // WithParentRunID links this run to a parent, building a run tree.

@@ -6,6 +6,22 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `WithDefaultVersion` on Init and `WithVersion` on NewRun label every run with
+  the build or prompt version that produced it (`AGENTPING_VERSION` also
+  works). The dashboard's Spend and Verify charts mark where each new version
+  was first seen.
+- Streamed Anthropic and OpenAI responses report `ttft_ms`, the time from the
+  request to the first content chunk, charted on Pulse as time to first token.
+- `instrumentation.WithContentCapture(maxChars)` on the transports sends the
+  prompt and completion on `llm_call` events: `input` as a list of
+  {role, content} messages, `output` as text and `system_instructions`. Off by
+  default; each piece is clipped at the cap (4000 when zero). The request body
+  is read and restored, so the provider sees it unchanged.
+- Events carry `turn`, and `Conversation` models a chat session as one run
+  (from the previous unreleased commits).
+
 ## [v0.1.0] - 2026-05-17
 
 Initial public release.
