@@ -6,6 +6,8 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v0.2.0] - 2026-10-28
+
 ### Added
 
 - `WithDefaultVersion` on Init and `WithVersion` on NewRun label every run with
@@ -19,8 +21,11 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   {role, content} messages, `output` as text and `system_instructions`. Off by
   default; each piece is clipped at the cap (4000 when zero). The request body
   is read and restored, so the provider sees it unchanged.
-- Events carry `turn`, and `Conversation` models a chat session as one run
-  (from the previous unreleased commits).
+- Events carry `turn`, the exchange they belong to, and `Conversation` models a
+  chat session as one run: every turn lands on a run whose id is derived
+  from the session id, so a stateless handler rebuilds it on any turn, and
+  an idle timeout (15 minutes by default) closes it as success when the user
+  walks away. The idle timeout and its closing status are settable on any run.
 
 ## [v0.1.0] - 2026-05-17
 
@@ -63,5 +68,6 @@ The 0.x line is pre-1.0. Public API may change before 1.0.0. We do not
 break the wire format between SDK and ingest without a version bump and
 a migration note here.
 
-[Unreleased]: https://github.com/agent-ping/agent-ping-go/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/agent-ping/agent-ping-go/compare/v0.2.0...HEAD
+[v0.2.0]: https://github.com/agent-ping/agent-ping-go/compare/v0.1.0...v0.2.0
 [v0.1.0]: https://github.com/agent-ping/agent-ping-go/releases/tag/v0.1.0
