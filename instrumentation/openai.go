@@ -9,6 +9,6 @@ import "net/http"
 //	client := openai.NewClient(option.WithHTTPClient(
 //	    instrumentation.OpenAIHTTPClient(http.DefaultTransport, run),
 //	))
-func OpenAIHTTPClient(base http.RoundTripper, run EventEmitter) *http.Client {
-	return &http.Client{Transport: NewOpenAITransport(base, run)}
+func OpenAIHTTPClient(base http.RoundTripper, run EventEmitter, opts ...TransportOption) *http.Client {
+	return &http.Client{Transport: NewOpenAITransport(base, run, opts...)}
 }

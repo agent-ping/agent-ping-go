@@ -57,6 +57,7 @@ type sdkState struct {
 	controlClient *httpClient
 	flushInterval time.Duration
 	batchSize     int
+	version       string
 }
 
 var (

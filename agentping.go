@@ -3,6 +3,9 @@ package agentping
 import (
 	"context"
 	"os"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -52,6 +55,9 @@ func Init(opts ...InitOption) error {
 	if cfg.batchSize <= 0 {
 		cfg.batchSize = defaultBatchSize
 	}
+	if cfg.version == "" {
+		cfg.version = os.Getenv("AGENTPING_VERSION")
+	}
 
 	if cfg.apiKey == "" {
 		warnOnce("auth_error", "no AGENTPING_API_KEY supplied; events will be dropped client-side.")
@@ -73,6 +79,7 @@ func Init(opts ...InitOption) error {
 		controlClient: controlClient,
 		flushInterval: cfg.flushInterval,
 		batchSize:     cfg.batchSize,
+		version:       strings.TrimSpace(cfg.version),
 	}
 	setState(s)
 	w.start()
@@ -81,6 +88,59 @@ func Init(opts ...InitOption) error {
 
 // NewRun starts a new run for the given agent name. The run's ID is generated
 // locally and is available the instant this call returns.
+// NewSessionID returns an id for Conversation. Keep it for the life of the chat.
+func NewSessionID() string {
+	return uuid7Hex()
+}
+
+// Conversation reports one chat session as one run, with every turn appended to
+// it. A conversation has no reliable end -- the user closes the tab, or simply
+// stops -- so pass the same sessionID on every turn and the turns collect on a
+// single record instead of becoming a run per message.
+//
+// The run id and its start time are both derived from sessionID, so a stateless
+// handler can rebuild this on any request without storing a mapping; re-opening
+// is idempotent server-side.
+//
+//	chat := agentping.Conversation("support-chat", sessionID)
+//	chat.Event("llm_call", map[string]any{"provider": "anthropic", "model": model,
+//		"input_tokens": in, "output_tokens": out})
+//	// ...and when the user closes the chat:
+//	chat.Finish(agentping.FinishOptions{Status: "success"})
+//
+// If Finish is never called the idle timeout closes it at its last activity.
+// sessionID must be 32 hex characters whose first 12 are the session's start
+// time in milliseconds; NewSessionID produces one.
+func Conversation(agent, sessionID string, opts ...RunOption) *Run {
+	if !sessionIDPattern.MatchString(sessionID) {
+		warnOnce("bad_session_id", "agentping.Conversation: sessionID must be 32 hex characters (see NewSessionID); reporting as a normal run.")
+
+		return NewRun(agent, opts...)
+	}
+	ms, err := strconv.ParseInt(sessionID[:12], 16, 64)
+	if err != nil || ms <= 0 {
+		warnOnce("bad_session_id", "agentping.Conversation: sessionID does not carry a start time; reporting as a normal run.")
+
+		return NewRun(agent, opts...)
+	}
+	region := "eu"
+	if s := getState(); s != nil {
+		region = s.region
+	}
+	defaults := []RunOption{
+		WithIdleTimeout(15 * time.Minute),
+		WithIdleStatus("success"),
+		func(c *runConfig) {
+			c.resumeID = "run_" + region + "_" + sessionID
+			c.resumeStart = time.UnixMilli(ms).UTC()
+		},
+	}
+
+	return NewRun(agent, append(defaults, opts...)...)
+}
+
+var sessionIDPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
+
 func NewRun(agent string, opts ...RunOption) *Run {
 	s := getState()
 	if s == nil {
@@ -98,10 +158,16 @@ func NewRun(agent string, opts ...RunOption) *Run {
 	if cfg.parentRunID == "" {
 		cfg.parentRunID = os.Getenv("AGENTPING_PARENT_RUN")
 	}
+	// A conversation reuses the id and start time derived from its session, so
+	// every turn re-opens the same run instead of minting a new one.
+	runID, startedAt := newID("run", s.region), time.Now().UTC()
+	if cfg.resumeID != "" {
+		runID, startedAt = cfg.resumeID, cfg.resumeStart
+	}
 	r := &Run{
-		ID:        newID("run", s.region),
+		ID:        runID,
 		Agent:     agent,
-		StartedAt: time.Now().UTC(),
+		StartedAt: startedAt,
 		state:     s,
 	}
 	body := map[string]any{
@@ -115,11 +181,22 @@ func NewRun(agent string, opts ...RunOption) *Run {
 	if cfg.feature != "" {
 		body["feature"] = cfg.feature
 	}
+	if version := strings.TrimSpace(cfg.version); version != "" {
+		body["version"] = version
+	} else if s.version != "" {
+		body["version"] = s.version
+	}
 	if cfg.metadata != nil {
 		body["metadata"] = cfg.metadata
 	}
 	if cfg.parentRunID != "" {
 		body["parent_run_id"] = cfg.parentRunID
+	}
+	if cfg.idleTimeout > 0 {
+		body["idle_timeout_seconds"] = cfg.idleTimeout
+		if cfg.idleStatus != "" {
+			body["idle_timeout_status"] = cfg.idleStatus
+		}
 	}
 	s.queue.push(envelope{kind: envRunStart, runID: r.ID, body: body})
 	s.worker.notifyEnqueued()

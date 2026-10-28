@@ -16,6 +16,7 @@ type initConfig struct {
 	flushInterval time.Duration
 	batchSize     int
 	httpClient    *http.Client
+	version       string
 }
 
 // WithAPIKey sets the API key directly. If not provided, AGENTPING_API_KEY is read.
@@ -55,6 +56,14 @@ func WithHTTPClient(h *http.Client) InitOption {
 	return func(c *initConfig) { c.httpClient = h }
 }
 
+// WithDefaultVersion labels every run this process starts with the build or
+// prompt version that produced it, unless the run sets its own WithVersion.
+// AGENTPING_VERSION also works. The dashboard's Spend and Verify charts mark
+// where each new version was first seen.
+func WithDefaultVersion(v string) InitOption {
+	return func(c *initConfig) { c.version = v }
+}
+
 // RunOption configures a new run.
 type RunOption func(*runConfig)
 
@@ -63,6 +72,11 @@ type runConfig struct {
 	feature     string
 	metadata    map[string]any
 	parentRunID string
+	idleTimeout int
+	idleStatus  string
+	resumeID    string
+	resumeStart time.Time
+	version     string
 }
 
 // WithCustomerID associates a run with an end customer.
@@ -80,9 +94,30 @@ func WithMetadata(m map[string]any) RunOption {
 	return func(c *runConfig) { c.metadata = m }
 }
 
+// WithVersion labels the run with the build or prompt version that produced
+// it (up to 64 characters), overriding Init's WithDefaultVersion.
+func WithVersion(v string) RunOption {
+	return func(c *runConfig) { c.version = v }
+}
+
 // WithParentRunID links this run to a parent, building a run tree.
 func WithParentRunID(id string) RunOption {
 	return func(c *runConfig) { c.parentRunID = id }
+}
+
+// WithIdleTimeout closes the run automatically once no event has arrived for
+// this long (60s-24h). For callers that cannot be relied on to call Finish: a
+// browser that gets closed, a process that gets killed. It also makes the run
+// resumable, so a later event reopens it rather than being an orphan.
+func WithIdleTimeout(d time.Duration) RunOption {
+	return func(c *runConfig) { c.idleTimeout = int(d.Seconds()) }
+}
+
+// WithIdleStatus sets what the idle sweep finishes the run with. The server
+// default is "timeout" -- we stopped waiting, we do not know how it went. A
+// conversation should pass "success": the user leaving is not a failure.
+func WithIdleStatus(status string) RunOption {
+	return func(c *runConfig) { c.idleStatus = status }
 }
 
 // FinishOption configures Run.Finish.

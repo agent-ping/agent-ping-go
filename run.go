@@ -19,7 +19,19 @@ type Run struct {
 
 // Event appends a typed event to the run. Returns ErrNotInitialized if the
 // SDK was not initialised; otherwise never blocks and never returns an error.
+// EventTurn appends an event that belongs to a numbered exchange of a
+// conversation. One turn is often several events -- call the model, run a tool,
+// call it again -- and turn is what groups them in the timeline. Number from 1.
+// Use Event for work that is not a conversation.
+func (r *Run) EventTurn(eventType string, data map[string]any, turn int) error {
+	return r.event(eventType, data, &turn)
+}
+
 func (r *Run) Event(eventType string, data map[string]any) error {
+	return r.event(eventType, data, nil)
+}
+
+func (r *Run) event(eventType string, data map[string]any, turn *int) error {
 	if r == nil || r.state == nil {
 		return ErrNotInitialized
 	}
@@ -37,6 +49,9 @@ func (r *Run) Event(eventType string, data map[string]any) error {
 		"type":        eventType,
 		"ts":          time.Now().UTC().Format(time.RFC3339Nano),
 		"data":        data,
+	}
+	if turn != nil {
+		evt["turn"] = *turn
 	}
 	r.state.queue.push(envelope{
 		kind:  envRunEvent,
